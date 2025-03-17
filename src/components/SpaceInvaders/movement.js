@@ -1,5 +1,3 @@
-import { GAME_CONFIG } from './constants';
-
 export const movePlayer = (gameState, keysPressed) => {
   const { player, boardWidth } = gameState;
   const newPlayer = { ...player };

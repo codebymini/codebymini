@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { GAME_CONFIG } from './constants';
 import { initializeGameState } from './gameState';
 import { movePlayer, moveBullets, moveAliens } from './movement';
 import {
@@ -12,6 +11,8 @@ import { renderGame } from './rendering';
 
 const SpaceInvaders = ({ onExit }) => {
   const [gameState, setGameState] = useState(initializeGameState());
+  const [isMobile, setIsMobile] = useState(false);
+  const [touchStartX, setTouchStartX] = useState(null);
   const gameLoopRef = useRef(null);
   const lastUpdateTimeRef = useRef(0);
   const keysPressedRef = useRef(new Set());
@@ -19,9 +20,21 @@ const SpaceInvaders = ({ onExit }) => {
   const containerRef = useRef(null);
   const alienMoveCounterRef = useRef(0);
 
-  // Handle keyboard events
+  // Check if device is mobile
   useEffect(() => {
-    console.log('Setting up keyboard handlers');
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Handle keyboard and touch events
+  useEffect(() => {
+    console.log('Setting up keyboard and touch handlers');
+
     const handleKeyDown = (e) => {
       console.log('Key down:', e.key);
       keysPressedRef.current.add(e.key);
@@ -43,6 +56,38 @@ const SpaceInvaders = ({ onExit }) => {
       keysPressedRef.current.delete(e.key);
     };
 
+    // Touch controls
+    const handleTouchStart = (e) => {
+      const touch = e.touches[0];
+      setTouchStartX(touch.clientX);
+    };
+
+    const handleTouchMove = (e) => {
+      if (touchStartX === null) return;
+
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - touchStartX;
+
+      // Clear previous movement keys
+      keysPressedRef.current.delete('ArrowLeft');
+      keysPressedRef.current.delete('ArrowRight');
+
+      // Add movement based on touch direction
+      if (deltaX < -10) {
+        keysPressedRef.current.add('ArrowLeft');
+      } else if (deltaX > 10) {
+        keysPressedRef.current.add('ArrowRight');
+      }
+
+      setTouchStartX(touch.clientX);
+    };
+
+    const handleTouchEnd = () => {
+      setTouchStartX(null);
+      keysPressedRef.current.delete('ArrowLeft');
+      keysPressedRef.current.delete('ArrowRight');
+    };
+
     // Focus the container when mounted
     if (containerRef.current) {
       containerRef.current.focus();
@@ -52,14 +97,25 @@ const SpaceInvaders = ({ onExit }) => {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
 
+    if (isMobile) {
+      window.addEventListener('touchstart', handleTouchStart);
+      window.addEventListener('touchmove', handleTouchMove);
+      window.addEventListener('touchend', handleTouchEnd);
+    }
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      if (isMobile) {
+        window.removeEventListener('touchstart', handleTouchStart);
+        window.removeEventListener('touchmove', handleTouchMove);
+        window.removeEventListener('touchend', handleTouchEnd);
+      }
       if (gameLoopRef.current) {
         clearInterval(gameLoopRef.current);
       }
     };
-  }, [onExit]);
+  }, [onExit, isMobile, touchStartX]);
 
   // Game loop
   useEffect(() => {
@@ -72,42 +128,28 @@ const SpaceInvaders = ({ onExit }) => {
       const deltaTime = currentTime - lastUpdateTimeRef.current;
       lastUpdateTimeRef.current = currentTime;
 
-      console.log(`Game loop frame ${frameCount}, deltaTime: ${deltaTime}ms`);
-      console.log('Current keys pressed:', Array.from(keysPressedRef.current));
-      console.log('Current game state:', {
-        player: gameState.player,
-        bullets: gameState.bullets,
-        aliens: gameState.aliens,
-        score: gameState.score,
-        lives: gameState.lives,
-      });
-
       setGameState((prevState) => {
-        // Don't update if game is over
-        if (prevState.gameOver) {
-          return prevState;
-        }
+        if (prevState.gameOver) return prevState;
 
         const newState = { ...prevState };
 
         // Update player position
         movePlayer(newState, keysPressedRef.current);
 
-        // Handle shooting
-        if (
-          keysPressedRef.current.has(' ') &&
-          currentTime - lastShotTimeRef.current >= 250
-        ) {
-          handleShooting(newState);
-          lastShotTimeRef.current = currentTime;
+        // Auto-shoot on mobile or handle space key
+        if (isMobile || keysPressedRef.current.has(' ')) {
+          if (currentTime - lastShotTimeRef.current >= (isMobile ? 500 : 250)) {
+            handleShooting(newState);
+            lastShotTimeRef.current = currentTime;
+          }
         }
 
         // Update bullets
         moveBullets(newState);
 
-        // Update aliens (every 3 frames)
+        // Update aliens (slower on mobile)
         alienMoveCounterRef.current++;
-        if (alienMoveCounterRef.current >= 3) {
+        if (alienMoveCounterRef.current >= (isMobile ? 4 : 3)) {
           moveAliens(newState);
           alienMoveCounterRef.current = 0;
         }
@@ -128,27 +170,14 @@ const SpaceInvaders = ({ onExit }) => {
           onExit();
         }
 
-        // Log state changes
-        if (
-          newState.bullets.length !== prevState.bullets.length ||
-          newState.aliens.length !== prevState.aliens.length ||
-          newState.score !== prevState.score
-        ) {
-          console.log('State changed:', {
-            bullets:
-              prevState.bullets.length + ' -> ' + newState.bullets.length,
-            aliens: prevState.aliens.length + ' -> ' + newState.aliens.length,
-            score: prevState.score + ' -> ' + newState.score,
-          });
-        }
-
         return newState;
       });
     };
 
-    // Slower game loop (100ms instead of 50ms)
-    gameLoopRef.current = setInterval(gameLoop, 100);
-    console.log('Game loop interval set up');
+    // Adjust game speed for mobile
+    const gameSpeed = isMobile ? 150 : 100;
+    gameLoopRef.current = setInterval(gameLoop, gameSpeed);
+    console.log(`Game loop interval set up with ${gameSpeed}ms delay`);
 
     return () => {
       if (gameLoopRef.current) {
@@ -156,19 +185,30 @@ const SpaceInvaders = ({ onExit }) => {
         console.log('Game loop interval cleared');
       }
     };
-  }, [onExit]);
+  }, [onExit, isMobile]);
 
   return (
-    <div ref={containerRef} tabIndex={0} className="p-4 focus:outline-none">
+    <div
+      ref={containerRef}
+      tabIndex={0}
+      className="p-4 focus:outline-none select-none touch-none"
+    >
       <div className="mb-4">
         <div className="text-[#60a5fa] mb-2">Score: {gameState.score}</div>
         <div className="text-[#60a5fa]">Lives: {gameState.lives}</div>
       </div>
-      <pre className="font-mono text-sm whitespace-pre">
+      <pre className="font-mono text-xs md:text-sm whitespace-pre">
         {renderGame(gameState)}
       </pre>
       <div className="mt-4 text-[#94a3b8] text-sm">
-        Controls: ← → to move, SPACE to shoot, ESC to exit
+        {isMobile ? (
+          <>
+            <div>Swipe left/right to move</div>
+            <div>Auto-shooting enabled</div>
+          </>
+        ) : (
+          'Controls: ← → to move, SPACE to shoot, ESC to exit'
+        )}
       </div>
     </div>
   );

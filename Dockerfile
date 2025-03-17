@@ -1,16 +1,37 @@
-# syntax=docker/dockerfile:1
+# Build stage
+FROM --platform=linux/amd64 node:18-alpine AS build
 
-FROM node:latest
-ENV NODE_ENV=production
+# Install pnpm
+RUN npm install -g pnpm
 
-WORKDIR /src
+WORKDIR /app
 
-RUN git clone https://github.com/codebymini/codebymini
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
 
-COPY ["package.json", "package-lock.json*", "./"]
+# Install dependencies
+RUN pnpm install --frozen-lockfile
 
-RUN npm install --omit=dev
-
+# Copy source code
 COPY . .
 
-CMD [ "npm", "start" ]
+# Build the app
+RUN pnpm build
+
+# Production stage
+FROM --platform=linux/amd64 nginx:1.24.0-alpine
+
+# Copy built assets from build stage
+COPY --from=build /app/build /usr/share/nginx/html
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Create nginx pid directory
+RUN mkdir -p /var/run/nginx
+
+# Expose port 80
+EXPOSE 80
+
+# Start nginx
+CMD ["/usr/sbin/nginx", "-g", "daemon off;"]
