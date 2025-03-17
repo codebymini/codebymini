@@ -64,6 +64,7 @@ body {
   /* 1 */
   line-height: inherit;
   /* 2 */
+  @apply bg-[#0f172a] text-white;
 }
 
 /*
@@ -664,5 +665,70 @@ video {
 .grayscale {
   --tw-grayscale: grayscale(100%);
   filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow);
+}
+
+/* Terminal input focus styles */
+.terminal-input:focus {
+  @apply outline-none;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* Terminal command prompt */
+.command-prompt::before {
+  content: '$';
+  @apply text-[#60a5fa] mr-2;
+}
+
+/* Terminal error message */
+.error-message {
+  @apply text-[#f87171];
+}
+
+/* Terminal success message */
+.success-message {
+  @apply text-[#34d399];
+}
+
+/* Terminal link */
+.terminal-link {
+  @apply text-[#60a5fa] hover:underline;
+}
+
+@import './animations.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles */
+body {
+  @apply bg-[#0f172a] text-white;
+}
+
+/* Terminal input focus styles */
+.terminal-input:focus {
+  @apply outline-none;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* Terminal command prompt */
+.command-prompt::before {
+  content: '$';
+  @apply text-[#60a5fa] mr-2;
+}
+
+/* Terminal error message */
+.error-message {
+  @apply text-[#f87171];
+}
+
+/* Terminal success message */
+.success-message {
+  @apply text-[#34d399];
+}
+
+/* Terminal link */
+.terminal-link {
+  @apply text-[#60a5fa] hover:underline;
 }
 
